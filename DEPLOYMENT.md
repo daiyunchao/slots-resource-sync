@@ -28,6 +28,42 @@ MCP协议默认使用stdio通信，**只能在本地使用**。当你需要：
 请求 → [1. IP白名单] → [2. API Key认证] → [3. 速率限制] → 任务执行
 ```
 
+### 代理信任配置说明
+
+根据你的部署架构，需要正确配置 `TRUST_PROXY`：
+
+#### 场景1：直接访问API服务器（不推荐生产环境）
+```
+客户端 → http://your-server:3000
+```
+配置：`TRUST_PROXY=false`
+
+#### 场景2：单层Nginx反向代理（推荐）
+```
+客户端 → Nginx (80/443) → API服务器 (3000)
+```
+配置：`TRUST_PROXY=1`
+
+#### 场景3：CDN + Nginx（如使用Cloudflare）
+```
+客户端 → Cloudflare CDN → Nginx → API服务器 (3000)
+```
+配置：`TRUST_PROXY=2`
+
+#### 场景4：本地反向代理
+```
+客户端 → 本地Nginx (127.0.0.1) → API服务器 (127.0.0.1:3000)
+```
+配置：`TRUST_PROXY=loopback`
+
+⚠️ **安全警告**：
+- **永远不要使用 `TRUST_PROXY=true`**，这会信任所有代理，攻击者可以伪造IP绕过限流
+- 只信任确切数量的代理跳数
+- 错误的配置可能导致：
+  - IP白名单失效
+  - 速率限制被绕过
+  - 日志记录错误的客户端IP
+
 #### 1. IP白名单
 
 只允许指定IP访问，其他IP直接拒绝。
@@ -142,9 +178,9 @@ ALLOWED_IPS=123.45.67.89,98.76.54.32
 CORS_ORIGIN=*
 
 # 代理信任设置（重要！）
-# 如果使用Nginx等反向代理，设置为true
+# 如果使用Nginx等反向代理，设置为1（信任第一层代理）
 # 如果直接访问API服务器，设置为false
-TRUST_PROXY=true
+TRUST_PROXY=1
 
 # 生产环境
 NODE_ENV=production
@@ -227,6 +263,56 @@ curl http://your-server-ip:3000/health
 
 # 应该返回：
 # {"success":true,"status":"healthy","timestamp":"..."}
+```
+
+### 步骤10：验证代理配置
+
+**重要**：验证 `TRUST_PROXY` 配置是否正确，确保安全功能正常工作。
+
+```bash
+# 1. 检查日志中的客户端IP
+pm2 logs resource-sync-api --lines 20
+
+# 应该看到类似：
+# API Request: GET /health, ip: <你的真实公网IP>
+
+# 2. 如果看到的是 127.0.0.1 或代理IP，说明配置有误
+# 检查当前配置
+cat .env | grep TRUST_PROXY
+
+# 3. 测试API调用（会记录IP）
+curl -X POST http://your-server-ip:3000/api/check-integrity \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"version": "v885"}'
+
+# 4. 再次查看日志，确认IP正确
+pm2 logs resource-sync-api --lines 5
+
+# 5. 如果IP不正确，调整TRUST_PROXY值
+vi .env
+# 修改 TRUST_PROXY=1 (如果是单层代理)
+# 或 TRUST_PROXY=false (如果直接访问)
+
+# 重启服务
+pm2 restart resource-sync-api
+```
+
+**如何判断配置正确**：
+- ✅ 日志中显示的IP是你的真实公网IP（运行 `curl ifconfig.me` 获取）
+- ✅ IP白名单正常工作（未授权IP被拒绝）
+- ✅ 没有 `express-rate-limit` 的警告信息
+
+**常见配置错误**：
+```bash
+# 错误1: TRUST_PROXY=true (不安全！)
+# 修正: TRUST_PROXY=1
+
+# 错误2: TRUST_PROXY=1 但直接访问API服务器
+# 修正: TRUST_PROXY=false
+
+# 错误3: TRUST_PROXY=false 但通过Nginx访问
+# 修正: TRUST_PROXY=1
 ```
 
 ## API使用方法

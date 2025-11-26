@@ -33,19 +33,29 @@ const ALLOWED_IPS = process.env.ALLOWED_IPS ? process.env.ALLOWED_IPS.split(',')
 // 配置信任代理（用于正确获取客户端IP）
 // 如果应用在反向代理（Nginx, Apache等）后面运行，需要启用此设置
 // 可以通过环境变量 TRUST_PROXY 配置：
-// - true: 信任所有代理
-// - false: 不信任代理
-// - number: 信任指定数量的代理跳数
-// - string: 自定义配置（如 'loopback, linklocal, uniquelocal'）
-const trustProxy = process.env.TRUST_PROXY || 'true';
-if (trustProxy === 'true') {
-  app.set('trust proxy', true);
-} else if (trustProxy === 'false') {
+// - 1: 信任第一层代理（推荐，适用于单层Nginx代理）
+// - 2: 信任两层代理
+// - false: 不信任代理（直接访问API服务器时使用）
+// - loopback: 只信任本地回环地址（127.0.0.1, ::1）
+const trustProxy = process.env.TRUST_PROXY || '1';
+if (trustProxy === 'false') {
   app.set('trust proxy', false);
+} else if (trustProxy === 'true') {
+  // 兼容旧配置，但不推荐使用
+  logger.warn('TRUST_PROXY=true is deprecated and insecure. Please use TRUST_PROXY=1 instead.');
+  console.warn('⚠️  WARNING: TRUST_PROXY=true is insecure! Change to TRUST_PROXY=1 in .env file');
+  app.set('trust proxy', 1); // 改为信任1层代理，而不是true
 } else if (!isNaN(trustProxy)) {
+  // 数字：信任指定数量的代理跳数
   app.set('trust proxy', parseInt(trustProxy, 10));
+} else if (trustProxy === 'loopback') {
+  // 只信任本地代理
+  app.set('trust proxy', 'loopback');
 } else {
-  app.set('trust proxy', trustProxy);
+  // 不支持的配置值，使用默认值
+  logger.error(`Invalid TRUST_PROXY value: ${trustProxy}. Using default: 1`);
+  console.error(`❌ ERROR: Invalid TRUST_PROXY value: ${trustProxy}. Using default: 1`);
+  app.set('trust proxy', 1);
 }
 
 // 安全性中间件
