@@ -94,7 +94,7 @@ export async function checkResourceIntegrity(version, taskId = null) {
     },
     {
       name: 'Match version',
-      cmd: `cd ${paths.match} && bash match_version.sh wtc ${version}`
+      cmd: `bash ${paths.match}/match_version.sh wtc ${version}`
     }
   ];
 
@@ -130,7 +130,7 @@ export async function syncFacebookResources(version, taskId = null) {
   const config = getConfig();
   const { paths } = config;
 
-  const command = `cd ${paths.nginx} && sh pubfbclient.sh wtc ${version}`;
+  const command = `bash ${paths.nginx}/pubfbclient.sh wtc ${version}`;
 
   logger.info(`Syncing Facebook resources for version: ${version}`, { taskId });
   return await executeCommand(command, 'Sync Facebook Resources', taskId);
@@ -150,7 +150,7 @@ export async function syncNativeResources(version, taskId = null) {
   const config = getConfig();
   const { paths } = config;
 
-  const command = `cd ${paths.nginx} && sh pubclient.sh wtc ${version}`;
+  const command = `bash ${paths.nginx}/pubclient.sh wtc ${version}`;
 
   logger.info(`Syncing Native resources for version: ${version}`, { taskId });
   return await executeCommand(command, 'Sync Native Resources', taskId);
