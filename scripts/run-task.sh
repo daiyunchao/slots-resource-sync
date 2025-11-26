@@ -16,8 +16,8 @@
 set -e  # 遇到错误立即退出
 
 # 配置
-API_URL="${API_URL:-http://localhost:3000}"
-API_KEY="${API_KEY:-}"
+API_URL="${API_URL:-https://slotssaga-v401.me2zengame.com/resource-sync-api}"
+API_KEY="${API_KEY:-c878313eb2c4b29f6cd45c443501d4a3ec48a03710168beec2a691c24fc5f67e}"
 
 # 颜色定义
 RED='\033[0;31m'

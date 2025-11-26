@@ -86,15 +86,15 @@ export async function checkResourceIntegrity(version, taskId = null) {
   const commands = [
     {
       name: 'Check iOS resources',
-      cmd: `cd ${paths.match} && ./match -seed ${paths.home}/wtc/assets_config/common_ios/project.manifest -root ${paths.home}/wtc/${version}/res_oldvegas/`
+      cmd: `${paths.match}/match -seed ${paths.home}/wtc/assets_config/common_ios/project.manifest -root ${paths.home}/wtc/${version}/res_oldvegas/`
     },
     {
       name: 'Check Android resources',
-      cmd: `cd ${paths.match} && ./match -seed ${paths.home}/wtc/assets_config/common_android/project.manifest -root ${paths.home}/wtc/${version}/res_oldvegas/`
+      cmd: `${paths.match}/match -seed ${paths.home}/wtc/assets_config/common_android/project.manifest -root ${paths.home}/wtc/${version}/res_oldvegas/`
     },
     {
       name: 'Match version',
-      cmd: `cd ${paths.match} && sh match_version.sh wtc ${version}`
+      cmd: `cd ${paths.match} && bash match_version.sh wtc ${version}`
     }
   ];
 
