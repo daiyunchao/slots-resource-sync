@@ -1,0 +1,17 @@
+{
+  "paths": {
+    "home": "/home/ec2-user",
+    "match": "/home/ec2-user/match",
+    "wtc": "/home/ec2-user/wtc",
+    "wtc_fb": "/home/ec2-user/wtc_fb",
+    "nginx": "/export/nginx/https",
+    "assets_config": "/home/ec2-user/wtc/assets_config"
+  },
+  "defaults": {
+    "versionOffset": 2
+  },
+  "logging": {
+    "level": "info",
+    "dir": "logs"
+  }
+}
