@@ -3,6 +3,8 @@ import { promisify } from 'util';
 import logger from '../utils/logger.js';
 import { getConfig } from '../utils/config.js';
 import { validateVersion, decrementVersion } from '../utils/version.js';
+import { executeCommandStream } from '../utils/task-executor.js';
+import taskManager from '../utils/task-manager.js';
 
 const execAsync = promisify(exec);
 
@@ -10,11 +12,38 @@ const execAsync = promisify(exec);
  * 执行shell命令并返回结果
  * @param {string} command - 要执行的命令
  * @param {string} taskName - 任务名称（用于日志）
+ * @param {string} taskId - 任务ID（可选，用于流式输出）
  * @returns {Promise<{success: boolean, stdout: string, stderr: string}>}
  */
-async function executeCommand(command, taskName) {
-  logger.info(`[${taskName}] Executing: ${command}`);
+async function executeCommand(command, taskName, taskId = null) {
+  logger.info(`[${taskName}] Executing: ${command}`, { taskId });
 
+  // 如果提供了taskId，使用流式执行
+  if (taskId) {
+    try {
+      const result = await executeCommandStream('/bin/bash', ['-c', command], taskId);
+
+      if (result.stderr && !result.stderr.includes('warning')) {
+        logger.warn(`[${taskName}] stderr: ${result.stderr}`, { taskId });
+      }
+
+      logger.info(`[${taskName}] ${result.success ? 'Success' : 'Failed'}`, { taskId });
+      return result;
+    } catch (error) {
+      logger.error(`[${taskName}] Failed: ${error.message}`, {
+        command,
+        error: error.stack,
+        taskId
+      });
+      return {
+        success: false,
+        stdout: '',
+        stderr: error.message
+      };
+    }
+  }
+
+  // 否则使用传统的exec方式（向后兼容）
   try {
     const { stdout, stderr } = await execAsync(command, {
       shell: '/bin/bash',
@@ -43,9 +72,10 @@ async function executeCommand(command, taskName) {
 /**
  * 任务1: 检查资源完整性
  * @param {string} version - 版本号，如 v885
+ * @param {string} taskId - 任务ID（可选，用于流式输出）
  * @returns {Promise<{success: boolean, results: Array}>}
  */
-export async function checkResourceIntegrity(version) {
+export async function checkResourceIntegrity(version, taskId = null) {
   if (!validateVersion(version)) {
     throw new Error(`Invalid version format: ${version}`);
   }
@@ -68,13 +98,13 @@ export async function checkResourceIntegrity(version) {
     }
   ];
 
-  logger.info(`Starting resource integrity check for version: ${version}`);
+  logger.info(`Starting resource integrity check for version: ${version}`, { taskId });
 
   const results = [];
   let allSuccess = true;
 
   for (const { name, cmd } of commands) {
-    const result = await executeCommand(cmd, name);
+    const result = await executeCommand(cmd, name, taskId);
     results.push({ name, ...result });
 
     if (!result.success) {
@@ -89,9 +119,10 @@ export async function checkResourceIntegrity(version) {
 /**
  * 任务2: 同步Facebook资源
  * @param {string} version - 版本号
+ * @param {string} taskId - 任务ID（可选，用于流式输出）
  * @returns {Promise<{success: boolean, stdout: string, stderr: string}>}
  */
-export async function syncFacebookResources(version) {
+export async function syncFacebookResources(version, taskId = null) {
   if (!validateVersion(version)) {
     throw new Error(`Invalid version format: ${version}`);
   }
@@ -101,16 +132,17 @@ export async function syncFacebookResources(version) {
 
   const command = `cd ${paths.nginx} && sh pubfbclient.sh wtc ${version}`;
 
-  logger.info(`Syncing Facebook resources for version: ${version}`);
-  return await executeCommand(command, 'Sync Facebook Resources');
+  logger.info(`Syncing Facebook resources for version: ${version}`, { taskId });
+  return await executeCommand(command, 'Sync Facebook Resources', taskId);
 }
 
 /**
  * 任务3: 同步Native资源
  * @param {string} version - 版本号
+ * @param {string} taskId - 任务ID（可选，用于流式输出）
  * @returns {Promise<{success: boolean, stdout: string, stderr: string}>}
  */
-export async function syncNativeResources(version) {
+export async function syncNativeResources(version, taskId = null) {
   if (!validateVersion(version)) {
     throw new Error(`Invalid version format: ${version}`);
   }
@@ -120,17 +152,18 @@ export async function syncNativeResources(version) {
 
   const command = `cd ${paths.nginx} && sh pubclient.sh wtc ${version}`;
 
-  logger.info(`Syncing Native resources for version: ${version}`);
-  return await executeCommand(command, 'Sync Native Resources');
+  logger.info(`Syncing Native resources for version: ${version}`, { taskId });
+  return await executeCommand(command, 'Sync Native Resources', taskId);
 }
 
 /**
  * 任务4: 修改reuse资源版本
  * @param {string} version - 当前版本号
  * @param {string} [nginxReuseVersion] - nginx的reuse版本号，如果不提供则使用 version-2
+ * @param {string} taskId - 任务ID（可选，用于流式输出）
  * @returns {Promise<{success: boolean, results: Array}>}
  */
-export async function updateReuseVersion(version, nginxReuseVersion = null) {
+export async function updateReuseVersion(version, nginxReuseVersion = null, taskId = null) {
   if (!validateVersion(version)) {
     throw new Error(`Invalid version format: ${version}`);
   }
@@ -141,8 +174,8 @@ export async function updateReuseVersion(version, nginxReuseVersion = null) {
   // 如果没有提供nginxReuseVersion，使用version-2作为默认值
   const calculatedNginxVersion = nginxReuseVersion || decrementVersion(version, defaults.versionOffset);
 
-  logger.info(`Updating reuse version: ${version} -> reuse_version`);
-  logger.info(`Nginx reuse version: ${calculatedNginxVersion} -> reuse_version`);
+  logger.info(`Updating reuse version: ${version} -> reuse_version`, { taskId });
+  logger.info(`Nginx reuse version: ${calculatedNginxVersion} -> reuse_version`, { taskId });
 
   const commands = [
     {
@@ -167,12 +200,12 @@ export async function updateReuseVersion(version, nginxReuseVersion = null) {
   let allSuccess = true;
 
   for (const { name, cmd } of commands) {
-    const result = await executeCommand(cmd, name);
+    const result = await executeCommand(cmd, name, taskId);
     results.push({ name, ...result });
 
     if (!result.success) {
       allSuccess = false;
-      logger.error(`Failed to update reuse version: ${name}`);
+      logger.error(`Failed to update reuse version: ${name}`, { taskId });
       // 发生错误时停止后续操作，避免数据不一致
       break;
     }

@@ -228,11 +228,26 @@ node src/cli.js full-sync -v v885 --no-confirm
 
 MCP协议只能在本地使用。当你需要从本地AI工具调用远程服务器上的任务时，需要使用HTTP API。
 
+#### 🆕 两种API服务器
+
+**标准API** (`api-server.js`)：
+- 同步响应，等待任务完成后返回结果
+- 适合快速任务（<30秒）
+- 可能会超时
+
+**SSE API** (`api-server-sse.js`) **←推荐**：
+- ✅ 异步任务，立即返回taskId
+- ✅ 实时流式输出，每行stdout/stderr都实时推送
+- ✅ 不会超时，适合长时间任务
+- ✅ 支持进度显示
+
+👉 **详细使用方法请查看 [SSE_API_GUIDE.md](./SSE_API_GUIDE.md)**
+
 #### 部署到远程服务器
 
 详细步骤请查看 [部署指南](./DEPLOYMENT.md)
 
-**快速开始：**
+**快速开始（SSE API - 推荐）：**
 
 ```bash
 # 1. 在服务器上安装依赖
@@ -242,15 +257,58 @@ npm install
 cp .env.example .env
 vi .env  # 设置API_KEY和ALLOWED_IPS
 
-# 3. 使用PM2启动
-pm2 start ecosystem.config.cjs
+# 3. 使用PM2启动SSE API服务器
+pm2 start ecosystem.config.cjs --only resource-sync-api-sse
 
 # 4. 设置开机自启动
 pm2 startup
 pm2 save
+
+# 5. 测试（使用HTML客户端）
+open examples/sse-client-example.html
 ```
 
-#### API调用示例
+**如果使用标准API：**
+
+```bash
+# 启动标准API服务器
+pm2 start ecosystem.config.cjs --only resource-sync-api
+```
+
+---
+
+## 🚀 像之前一样简单使用SSE API
+
+**不想写复杂的客户端代码？我们提供了简化脚本！**
+
+### 快速使用（推荐）
+
+```bash
+# 1. 配置环境变量（一次性）
+export API_URL=http://your-server:3000
+export API_KEY=your-api-key
+
+# 2. 使用Node.js包装脚本（像之前一样简单！）
+node scripts/run-task.js check-integrity v885
+node scripts/run-task.js sync-facebook v885
+node scripts/run-task.js full-sync v885 --skip-check
+
+# 或使用Bash脚本（不需要Node.js）
+chmod +x scripts/run-task.sh
+./scripts/run-task.sh check-integrity v885
+```
+
+**特点：**
+- ✅ 像之前一样简单（一行命令）
+- ✅ 实时看到脚本输出
+- ✅ 不会超时
+- ✅ 有进度显示
+
+👉 **详细说明请查看 [简单使用指南](./SIMPLE_USAGE.md)**
+
+---
+
+#### API调用示例（如果需要自己写客户端）
 
 ```bash
 # 检查资源完整性
@@ -274,9 +332,56 @@ curl -X POST http://your-server:3000/api/full-sync \
 - ✅ **请求日志** - 所有请求都被记录
 - ✅ **Nginx反向代理** - 可配置HTTPS加密
 
-### 3. MCP 方式（仅限本地）
+### 3. MCP 方式
 
-#### 配置 MCP
+#### 🆕 两种MCP服务器
+
+**本地MCP** (`mcp-server.js`) - 仅限本地：
+- 在本地执行脚本
+- 适合脚本就在本地的场景
+- 可能有超时问题
+
+**远程MCP** (`mcp-server-remote.js`) **←推荐**：
+- ✅ 调用远程SSE API服务器
+- ✅ 在Claude Desktop中使用，体验好
+- ✅ 支持长时间任务，不超时
+- ✅ 实时显示脚本输出
+
+👉 **详细配置请查看 [MCP远程配置指南](./MCP_REMOTE_SETUP.md)**
+
+#### 配置远程MCP（推荐）
+
+在你的 Claude Desktop 配置文件中添加：
+
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "slots-resource-sync-remote": {
+      "command": "node",
+      "args": ["/本地路径/slots-resource-sync/src/mcp-server-remote.js"],
+      "env": {
+        "API_URL": "http://your-server:3000",
+        "API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+**使用示例**（在Claude Desktop中）：
+```
+你：请帮我检查v885版本的资源完整性
+
+Claude：好的，我来帮你检查...
+[实时显示脚本输出]
+✅ 检查完成！所有资源正常。
+```
+
+---
+
+#### 配置本地MCP（传统方式）
 
 在你的 AI 工具配置文件中添加：
 
