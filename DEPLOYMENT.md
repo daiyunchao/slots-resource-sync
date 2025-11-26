@@ -141,6 +141,11 @@ ALLOWED_IPS=123.45.67.89,98.76.54.32
 # CORS设置
 CORS_ORIGIN=*
 
+# 代理信任设置（重要！）
+# 如果使用Nginx等反向代理，设置为true
+# 如果直接访问API服务器，设置为false
+TRUST_PROXY=true
+
 # 生产环境
 NODE_ENV=production
 ```

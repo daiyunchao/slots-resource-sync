@@ -30,6 +30,24 @@ const PORT = process.env.API_PORT || 3000;
 const API_KEY = process.env.API_KEY;
 const ALLOWED_IPS = process.env.ALLOWED_IPS ? process.env.ALLOWED_IPS.split(',') : [];
 
+// 配置信任代理（用于正确获取客户端IP）
+// 如果应用在反向代理（Nginx, Apache等）后面运行，需要启用此设置
+// 可以通过环境变量 TRUST_PROXY 配置：
+// - true: 信任所有代理
+// - false: 不信任代理
+// - number: 信任指定数量的代理跳数
+// - string: 自定义配置（如 'loopback, linklocal, uniquelocal'）
+const trustProxy = process.env.TRUST_PROXY || 'true';
+if (trustProxy === 'true') {
+  app.set('trust proxy', true);
+} else if (trustProxy === 'false') {
+  app.set('trust proxy', false);
+} else if (!isNaN(trustProxy)) {
+  app.set('trust proxy', parseInt(trustProxy, 10));
+} else {
+  app.set('trust proxy', trustProxy);
+}
+
 // 安全性中间件
 app.use(helmet());
 
