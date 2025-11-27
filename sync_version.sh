@@ -148,10 +148,7 @@ fi
 
 echo ""
 wait_continue "继续执行步骤1: 验证资源的完整性"
-if [ $? -eq 1 ]; then
-    print_warning "用户选择跳过,退出脚本"
-    exit 0
-fi
+# 如果用户选择跳过,直接继续执行后续步骤(不做任何特殊处理)
 
 # ============================================
 # 步骤1: 验证资源的完整性
@@ -164,78 +161,84 @@ step1() {
     print_info "当前版本: v${VERSION}"
 
     wait_continue "验证iOS配置 (match -seed common_ios)"
-    if [ $? -eq 1 ]; then
-        print_warning "跳过步骤1"
-        return
-    fi
+    if [ $? -eq 0 ]; then
+        print_info "切换到目录: /home/ec2-user/match"
+        cd /home/ec2-user/match || {
+            print_error "无法切换到 /home/ec2-user/match 目录"
+            return 1
+        }
 
-    print_info "切换到目录: /home/ec2-user/match"
-    cd /home/ec2-user/match || {
-        print_error "无法切换到 /home/ec2-user/match 目录"
-        return 1
-    }
+        print_info "执行: ./match -seed (iOS配置)..."
+        print_warning "命令正在后台运行,查看输出后按 Enter 键终止进程..."
 
-    print_info "执行: ./match -seed (iOS配置)..."
-    print_warning "等待命令输出完成后3秒无新输出将自动终止..."
-
-    # 使用后台进程+监控输出的方式，3秒无输出自动终止
-    (
+        # 在后台运行match命令
         ./match -seed /home/ec2-user/wtc/assets_config/common_ios/project.manifest \
             -root /home/ec2-user/wtc/v${VERSION}/res_oldvegas/ &
         MATCH_PID=$!
 
-        # 监控进程，3秒无输出则终止
-        ( sleep 3 && kill $MATCH_PID 2>/dev/null ) &
-        TIMER_PID=$!
+        # 等待用户按Enter终止
+        echo ""
+        echo -e "${YELLOW}进程ID: ${MATCH_PID}${NC}"
+        echo -e "${YELLOW}按 Enter 键终止该进程...${NC}"
+        read -r
 
+        # 终止进程
+        kill $MATCH_PID 2>/dev/null
         wait $MATCH_PID 2>/dev/null
-        kill $TIMER_PID 2>/dev/null
-    )
 
-    print_success "iOS配置验证完成"
-    wait_continue "验证Android配置 (match -seed common_android)"
-    if [ $? -eq 1 ]; then
-        print_warning "跳过剩余验证步骤"
-        return
+        print_success "iOS配置验证完成"
+    else
+        print_warning "跳过iOS配置验证"
     fi
 
-    print_info "执行: ./match -seed (Android配置)..."
-    print_warning "等待命令输出完成后3秒无新输出将自动终止..."
+    wait_continue "验证Android配置 (match -seed common_android)"
+    if [ $? -eq 0 ]; then
+        print_info "执行: ./match -seed (Android配置)..."
+        print_warning "命令正在后台运行,查看输出后按 Enter 键终止进程..."
 
-    (
+        # 在后台运行match命令
         ./match -seed /home/ec2-user/wtc/assets_config/common_android/project.manifest \
             -root /home/ec2-user/wtc/v${VERSION}/res_oldvegas/ &
         MATCH_PID=$!
 
-        ( sleep 3 && kill $MATCH_PID 2>/dev/null ) &
-        TIMER_PID=$!
+        # 等待用户按Enter终止
+        echo ""
+        echo -e "${YELLOW}进程ID: ${MATCH_PID}${NC}"
+        echo -e "${YELLOW}按 Enter 键终止该进程...${NC}"
+        read -r
 
+        # 终止进程
+        kill $MATCH_PID 2>/dev/null
         wait $MATCH_PID 2>/dev/null
-        kill $TIMER_PID 2>/dev/null
-    )
 
-    print_success "Android配置验证完成"
-    wait_continue "执行版本验证 (match_version.sh)"
-    if [ $? -eq 1 ]; then
-        print_warning "跳过版本验证步骤"
-        return
+        print_success "Android配置验证完成"
+    else
+        print_warning "跳过Android配置验证"
     fi
 
-    print_info "执行: sh match_version.sh..."
-    print_warning "等待命令输出完成后3秒无新输出将自动终止..."
+    wait_continue "执行版本验证 (match_version.sh)"
+    if [ $? -eq 0 ]; then
+        print_info "执行: sh match_version.sh..."
+        print_warning "命令正在后台运行,查看输出后按 Enter 键终止进程..."
 
-    (
+        # 在后台运行match_version.sh
         sh match_version.sh wtc v${VERSION} &
         MATCH_PID=$!
 
-        ( sleep 3 && kill $MATCH_PID 2>/dev/null ) &
-        TIMER_PID=$!
+        # 等待用户按Enter终止
+        echo ""
+        echo -e "${YELLOW}进程ID: ${MATCH_PID}${NC}"
+        echo -e "${YELLOW}按 Enter 键终止该进程...${NC}"
+        read -r
 
+        # 终止进程
+        kill $MATCH_PID 2>/dev/null
         wait $MATCH_PID 2>/dev/null
-        kill $TIMER_PID 2>/dev/null
-    )
 
-    print_success "版本: v${VERSION} ✅ 资源检查完成"
+        print_success "版本: v${VERSION} ✅ 资源检查完成"
+    else
+        print_warning "跳过版本验证步骤"
+    fi
 }
 
 # ============================================
