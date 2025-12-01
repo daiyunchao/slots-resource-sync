@@ -219,23 +219,15 @@ step1() {
     wait_continue "执行版本验证 (match_version.sh)"
     if [ $? -eq 0 ]; then
         print_info "执行: sh match_version.sh..."
-        print_warning "命令正在后台运行,查看输出后按 Enter 键终止进程..."
 
-        # 在后台运行match_version.sh
-        sh match_version.sh wtc v${VERSION} &
-        MATCH_PID=$!
+        # 直接在前台运行match_version.sh,等待其自行完成
+        sh match_version.sh wtc v${VERSION}
 
-        # 等待用户按Enter终止
-        echo ""
-        echo -e "${YELLOW}进程ID: ${MATCH_PID}${NC}"
-        echo -e "${YELLOW}按 Enter 键终止该进程...${NC}"
-        read -r
-
-        # 终止进程
-        kill $MATCH_PID 2>/dev/null
-        wait $MATCH_PID 2>/dev/null
-
-        print_success "版本: v${VERSION} ✅ 资源检查完成"
+        if [ $? -eq 0 ]; then
+            print_success "版本: v${VERSION} ✅ 资源检查完成"
+        else
+            print_error "版本验证脚本执行失败"
+        fi
     else
         print_warning "跳过版本验证步骤"
     fi
